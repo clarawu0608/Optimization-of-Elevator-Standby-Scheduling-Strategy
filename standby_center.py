@@ -17,19 +17,19 @@ def get_config():
                         help="Time (minutes) before an elevator enters standby mode")
     parser.add_argument("--sim_time", type=int, default=1440 * 5,
                         help="Total simulation time in minutes")
-    parser.add_argument("--num_floors", type=int, default=10,
+    parser.add_argument("--num_floors", type=int, default=20,
                         help="Number of floors in the building")
-    parser.add_argument("--num_elevators", type=int, default=2,
+    parser.add_argument("--num_elevators", type=int, default=4,
                         help="Number of elevators in the system")
-    parser.add_argument("--input", type=str, default="passengers_dataset/10floors",
+    parser.add_argument("--input", type=str, default="passengers_dataset/20floors",
                         help="Input CSV file with passenger arrival data")
     parser.add_argument("--output_csv", type=str, default="standby_elevator_results.csv",
                         help="Output CSV file for storing results")
     parser.add_argument("--w", type=float, default=0.7,
                         help="Weight for wait time in standby floor calculation")
     parser.add_argument("--std", type=float, default=1.0,
-                        help="Standard deviation for energy     score in standby floor calculation")
-    parser.add_argument("--window", type=float, default=240.0,
+                        help="Standard deviation for energy score in standby floor calculation")
+    parser.add_argument("--window", type=float, default=300.0,
                         help="Time window for decay-weighted arrivals in standby floor calculation")
     parser.add_argument("--decay_mode", type=str, default="quadratic", choices=["linear", "exponential", "quadratic"],
                         help="Decay mode for scoring passenger arrival times")
@@ -216,65 +216,7 @@ class Elevator:
 
     def compute_standby_floor(self):
         num_floors = self.num_floors
-        now = self.env.now
-        demand_vector = np.zeros(num_floors)
-
-        # Dynamic window size based on inverse of number of requests
-        if self.dynamic_window_size:
-            num_requests = sum(len(q) for q in self.dispatcher.history.values())
-            raw_adjusted_window = self.window * (1.0 / (1 + num_requests))  # inverse scaling
-            min_window = 10.0  # minutes
-            adjusted_window = max(min_window, raw_adjusted_window)
-            window_range = adjusted_window
-        else:
-            window_range = self.window
-
-        for floor in range(num_floors):
-            arrivals = self.dispatcher.history[floor]
-            score = 0.0
-            for t in arrivals:
-                dt = now - t
-                if dt <= window_range:
-                    if self.decay_mode == "exponential":
-                        score += np.exp(- (3 * dt) / (self.type * window_range))
-                    elif self.decay_mode == "linear":
-                        score += max(0, 1 - dt / (self.type * window_range))
-                    elif self.decay_mode == "quadratic":
-                        score += max(0, 1 - (dt / (self.type * window_range)) ** 2)
-            demand_vector[floor] = score
-
-        if np.sum(demand_vector) > 0:
-            score_wait = demand_vector / np.sum(demand_vector)
-        else:
-            score_wait = np.ones(num_floors) / num_floors
-        # print(f"[DEBUG] Score wait: {score_wait}")
-
-        floors = np.arange(num_floors)
-        score_energy = np.exp(-((floors - self.current_floor) ** 2) / (2 * self.std ** 2))
-        score_energy /= np.sum(score_energy)
-        
-
-        # max_value = 1.0
-        # slope = 0.4  # adjust as needed, e.g., 0.1 means score drops by 0.1 per floor
-        # # Linear decay
-        # score_energy = np.maximum(0, max_value - slope * np.abs(floors - self.current_floor))
-        # score_energy /= np.sum(score_energy)
-
-        combined_score = self.w * score_wait + (1 - self.w) * score_energy
-        # print(f"[DEBUG] Combined score: {combined_score}")
-
-        if self.use_sliding_window:
-            weights = np.array([0.05, 0.9, 0.05])
-            combined_score = np.convolve(combined_score, weights, mode='same')
-
-        if self.optimal_cost_func:
-            costs = np.array([
-                np.sum(np.abs(np.arange(num_floors) - x) * combined_score)
-                for x in range(num_floors)
-            ])
-            return int(np.argmin(costs))
-        else:
-            return int(np.argmax(combined_score))
+        return num_floors // 2  # Default to middle floor if no requests
 
 
 class Dispatcher:

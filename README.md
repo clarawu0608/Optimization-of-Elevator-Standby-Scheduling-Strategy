@@ -12,7 +12,7 @@ Simulate and compare elevator dispatching strategies, focusing on standby schedu
 ## Requirements
 
 ```bash
-pip install simpy numpy pandas matplotlib
+pip install -r requirements.txt
 ```
 
 ---
